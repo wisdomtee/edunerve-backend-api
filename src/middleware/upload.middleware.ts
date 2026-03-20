@@ -1,15 +1,21 @@
-import multer from "multer";
-import path from "path";
+import multer from "multer"
+import { CloudinaryStorage } from "multer-storage-cloudinary"
+import { v2 as cloudinary } from "cloudinary"
 
-const storage = multer.diskStorage({
-  destination: "uploads/",
-  filename: (_, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
-  limits: {
-  fileSize: 10 * 1024 * 1024
-}
-});
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (_req, _file) => ({
+    folder: "edunerve",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+  }),
+})
 
-export const upload = multer({ storage });
+const upload = multer({ storage })
+
+export default upload
