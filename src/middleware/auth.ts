@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string
     email: string
+    role: string
   }
 }
 
@@ -17,19 +18,30 @@ export const authMiddleware = (
     const authHeader = req.headers.authorization
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized" })
+      return res.status(401).json({
+        message: "Unauthorized: No token provided",
+      })
     }
 
     const token = authHeader.split(" ")[1]
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message: "JWT_SECRET is missing in .env",
+      })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as {
       id: string
       email: string
+      role: string
     }
 
     req.user = decoded
     next()
   } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired token" })
+    return res.status(401).json({
+      message: "Unauthorized: Invalid token",
+    })
   }
 }

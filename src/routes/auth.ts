@@ -10,10 +10,10 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body
 
     console.log("LOGIN ATTEMPT:", email)
-    console.log("PRISMA CHECK:", prisma)
+    console.log("PRISMA INSTANCE:", prisma)
 
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     })
 
     if (!user) {
@@ -37,14 +37,14 @@ router.post("/login", async (req, res) => {
       token,
       user: {
         id: user.id,
-        email: user.email
-      }
+        email: user.email,
+      },
     })
   } catch (error: any) {
     console.error("LOGIN ERROR:", error)
     return res.status(500).json({
       message: "Login failed",
-      error: error?.message || "Unknown error"
+      error: error.message,
     })
   }
 })

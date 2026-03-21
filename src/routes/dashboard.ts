@@ -1,94 +1,117 @@
 import { Router } from "express"
-import { prisma } from "../prisma"
+import prisma from "../prisma"
 import { authMiddleware } from "../middleware/auth"
 
 const router = Router()
 
-router.get("/stats", authMiddleware, async (_req, res) => {
+router.get("/stats", authMiddleware, async (req, res) => {
   try {
+    const totalStudents = await prisma.student.count()
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    const totalStudents = await prisma.student.count()
-
     const presentToday = await prisma.attendance.count({
       where: {
-        status: "Present",
         date: {
           gte: today,
           lt: tomorrow,
         },
+        status: "PRESENT",
       },
     })
 
     const absentToday = await prisma.attendance.count({
       where: {
-        status: "Absent",
         date: {
           gte: today,
           lt: tomorrow,
         },
+        status: "ABSENT",
       },
     })
 
     const lateToday = await prisma.attendance.count({
       where: {
-        status: "Late",
         date: {
           gte: today,
           lt: tomorrow,
         },
+        status: "LATE",
       },
     })
 
-    res.json({
+    return res.status(200).json({
       totalStudents,
       presentToday,
       absentToday,
       lateToday,
     })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: "Failed to fetch dashboard stats" })
+  } catch (error: any) {
+    console.error("DASHBOARD STATS ERROR:", error)
+    return res.status(500).json({
+      message: "Failed to fetch dashboard stats",
+      error: error.message,
+    })
   }
 })
 
-router.get("/attendance-week", authMiddleware, async (_req, res) => {
+router.get("/attendance-week", authMiddleware, async (req, res) => {
   try {
     const today = new Date()
-    const days: { date: string; present: number }[] = []
+    today.setHours(23, 59, 59, 999)
 
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - i)
-      date.setHours(0, 0, 0, 0)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+    sevenDaysAgo.setHours(0, 0, 0, 0)
 
-      const nextDay = new Date(date)
-      nextDay.setDate(date.getDate() + 1)
-
-      const count = await prisma.attendance.count({
-        where: {
-          status: "Present",
-          date: {
-            gte: date,
-            lt: nextDay,
-          },
+    const attendance = await prisma.attendance.findMany({
+      where: {
+        date: {
+          gte: sevenDaysAgo,
+          lte: today,
         },
-      })
+        status: "PRESENT",
+      },
+      select: {
+        date: true,
+      },
+      orderBy: {
+        date: "asc",
+      },
+    })
 
-      days.push({
-        date: date.toLocaleDateString("en-US", { weekday: "short" }),
-        present: count,
-      })
+    const grouped: Record<string, number> = {}
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sevenDaysAgo)
+      d.setDate(sevenDaysAgo.getDate() + i)
+      const key = d.toISOString().split("T")[0]
+      grouped[key] = 0
     }
 
-    res.json(days)
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: "Failed to fetch weekly attendance" })
+    attendance.forEach((item) => {
+      const key = item.date.toISOString().split("T")[0]
+      if (grouped[key] !== undefined) {
+        grouped[key] += 1
+      }
+    })
+
+    const result = Object.entries(grouped).map(([date, present]) => ({
+      date,
+      present,
+    }))
+
+    return res.status(200).json(result)
+  } catch (error: any) {
+    console.error("ATTENDANCE WEEK ERROR:", error)
+    return res.status(500).json({
+      message: "Failed to fetch weekly attendance",
+      error: error.message,
+    })
   }
 })
 

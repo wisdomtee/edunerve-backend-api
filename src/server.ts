@@ -12,17 +12,17 @@ import attendanceRouter from "./routes/attendance"
 import dashboardRouter from "./routes/dashboard"
 import resultsRouter from "./routes/results"
 import reportRouter from "./routes/report"
+import adminRoutes from "./routes/admin"
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// ✅ Allow both local + production frontend
 const allowedOrigins = [
   "http://localhost:3000",
-  process.env.FRONTEND_URL // <-- add this in Render env
-]
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[]
 
 app.use(
   cors({
@@ -38,15 +38,14 @@ app.use(
 )
 
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
-// ✅ Static uploads (works locally + production)
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")))
 
 app.get("/", (_req, res) => {
-  res.send("EduCore API is running 🚀")
+  res.status(200).send("EduCore API is running 🚀")
 })
 
-// ✅ Routes
 app.use("/auth", authRouter)
 app.use("/students", studentsRouter)
 app.use("/teachers", teachersRouter)
@@ -56,8 +55,22 @@ app.use("/attendance", attendanceRouter)
 app.use("/dashboard", dashboardRouter)
 app.use("/results", resultsRouter)
 app.use("/report", reportRouter)
+app.use("/admin", adminRoutes)
 
-// ✅ Use Render port
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("SERVER ERROR:", err)
+
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      message: "CORS error: origin not allowed",
+    })
+  }
+
+  return res.status(500).json({
+    message: "Internal server error",
+  })
+})
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`)
 })
